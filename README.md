@@ -39,15 +39,20 @@ uv run s200 run                 # 記録 + ダッシュボード (http://localho
 
 初回は macOS が Bluetooth の利用許可を求めます（システム設定 → プライバシーとセキュリティ → Bluetooth）。
 
-### デスクトップウィンドウ（仮 UI）
+### Mac アプリ（WeightLog）
+
+常駐 (`s200 run`) の API を読む SwiftUI アプリです。メニューバーに最新の体重を常時表示し、
+乗った瞬間にリアクション（カウントアップ・ひとこと・節目の紙吹雪・通知）を出します。
 
 ```bash
-uv sync --extra desktop
-uv run s200-desktop
+cd app
+xcodegen generate
+xcodebuild -project WeightLog.xcodeproj -scheme WeightLog -derivedDataPath build build
+open build/Build/Products/Debug/WeightLog.app
 ```
 
-ダッシュボードを Mac のネイティブウィンドウで開きます。常駐 (`s200 run`) が動いていればそれを表示し、
-止まっていれば SQLite を直接読んで表示します（この場合は受信はしません）。
+外れ値（家族が乗った・荷物を持っていた等）は自動で「除外」され、グラフの点や最近の記録から戻せます。
+身長・目標・スタート体重はアプリの設定（⌘,）で変更できます。
 
 ### ログイン時に自動起動（任意）
 
