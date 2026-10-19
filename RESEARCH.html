@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>S200 体重計 BLE 調査メモ (2026-10-19)</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#22262b; --muted:#6b7280; --border:#e3e6ea;
+  --link:#0b62d0; --code-bg:#f5f6f8; --quote-bg:#f7f8fa; --accent:#0b62d0;
+  --table-head:#f5f6f8; --table-zebra:#fafbfc; --shadow:0 1px 2px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15181c; --fg:#d8dde3; --muted:#98a1ad; --border:#2b3037;
+    --link:#78b1ff; --code-bg:#1d2126; --quote-bg:#1b1f24; --accent:#78b1ff;
+    --table-head:#1d2126; --table-zebra:#191d22; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Hiragino Sans",
+    "Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+  font-size:16.5px; line-height:1.85;
+  font-feature-settings:"palt" 1;
+}
+main{max-width:700px; margin:0 auto; padding:64px 22px 120px}
+h1,h2,h3,h4,h5,h6{line-height:1.4; font-weight:700; margin:2.2em 0 .7em; letter-spacing:.01em}
+h1{font-size:1.95em; margin-top:0; letter-spacing:0}
+h2{font-size:1.42em; padding-bottom:.3em; border-bottom:1px solid var(--border)}
+h3{font-size:1.18em}
+h4,h5,h6{font-size:1em}
+h1+*,h2+*,h3+*{margin-top:0}
+p{margin:0 0 1.15em}
+a{color:var(--link); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--link) 35%,transparent)}
+a:hover{border-bottom-color:var(--link)}
+strong{font-weight:700}
+del{color:var(--muted)}
+hr{border:0; border-top:1px solid var(--border); margin:2.6em 0}
+ul,ol{margin:0 0 1.15em; padding-left:1.5em}
+li{margin:.3em 0}
+li>ul,li>ol{margin:.3em 0}
+ul.task-list{list-style:none; padding-left:1.55em}
+li.task-item{position:relative}
+li.task-item>input{
+  position:absolute; left:-1.4em; top:.42em; margin:0;
+  accent-color:var(--accent); width:1em; height:1em;
+}
+blockquote{
+  margin:1.4em 0; padding:.9em 1.1em; border-left:3px solid var(--accent);
+  background:var(--quote-bg); border-radius:0 8px 8px 0; color:var(--muted);
+}
+blockquote>:last-child{margin-bottom:0}
+code{
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.875em; background:var(--code-bg); padding:.15em .38em; border-radius:5px;
+}
+.code-block{position:relative; margin:1.5em 0}
+.code-block pre{
+  margin:0; padding:1em 1.1em; overflow-x:auto; background:var(--code-bg);
+  border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow);
+}
+.code-block pre code{background:none; padding:0; font-size:.86em; line-height:1.65; display:block}
+.code-lang{
+  position:absolute; top:.55em; right:.8em; font-size:.68em; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); pointer-events:none;
+}
+.table-wrap{overflow-x:auto; margin:1.6em 0}
+table{border-collapse:collapse; width:100%; font-size:.94em}
+th,td{border:1px solid var(--border); padding:.55em .8em; text-align:left; vertical-align:top}
+th{background:var(--table-head); font-weight:600; white-space:nowrap}
+tbody tr:nth-child(even){background:var(--table-zebra)}
+img{max-width:100%; height:auto; border-radius:8px; display:block; margin:1.4em auto}
+.doc-meta{color:var(--muted); font-size:.8em; margin:3.5em 0 0; padding-top:1.2em; border-top:1px solid var(--border)}
+@media print{body{background:#fff} main{padding:0}}
+</style>
+</head>
+<body>
+<main>
+<h1 id="s200-体重計-ble-調査メモ-2026-10-19">S200 体重計 BLE 調査メモ (2026-10-19)</h1>
+<h2 id="前提の訂正">前提の訂正</h2>
+<ul>
+<li>「HUAWEI S200」という体重計は見つからない。HUAWEI の現行は Scale 3 / 3 Pro（Hagrid/WSP 暗号化 GATT、CAK/C1/C2 が必要で難度高）。</li>
+<li>「S200」は <strong>Xiaomi スマート体重計 S200（MJTZC02YM / BLE名 yunmai.scales.ms106 等）</strong> の可能性が高い。→ 要実機確認（裏面・箱の表記）。</li>
+</ul>
+<h2 id="xiaomi-s200-のプロトコル要点">Xiaomi S200 のプロトコル要点</h2>
+<ul>
+<li>広告: Service Data UUID <code>0xFE95</code>（MiBeacon v4/v5）。product id = service data の byte 2–3 LE（<code>0x4C04</code> / <code>0x4DCB</code> / <code>0x45C9</code>）。</li>
+<li>計量確定時にだけ object <code>0x4E16</code> を <strong>AES-128-CCM 暗号化</strong>で送出。復号に <strong>bindkey (BLE KEY, 32hex)</strong> が必要。
+<ul>
+<li>nonce = MAC逆順(6) + payload<a href="3">2..5</a> + 拡張カウンタ(3)、AAD=<code>0x11</code>、tag 4byte</li>
+<li>復号後 <code>0x4E16</code> (9 bytes): <code>profile_id u8 | weight u32 LE (kg×100, 0=降りた) | unix ts u32 LE</code></li>
+</ul></li>
+<li>体脂肪電極なし（体重のみ）。</li>
+<li>GATT 接続 + TOKEN(24hex) で本体メモリの未取得記録も取れるが、接続はスケールを起こし続け電池消耗/固まる事例あり。<strong>パッシブ受信推奨</strong>。</li>
+<li>bindkey/TOKEN/MAC は Xiaomi Home でペアリング後に PiotrMachowski/Xiaomi-cloud-tokens-extractor で取得。</li>
+<li>macOS(CoreBluetooth) は MAC を隠すため、MAC は手入力（抽出ツールの出力 or アイドル広告内の MAC）。</li>
+</ul>
+<h2 id="参考実装">参考実装</h2>
+<ul>
+<li>Bluetooth-Devices/xiaomi-ble (HA 公式パーサ, obj4e16, テストに実パケット+bindkey)</li>
+<li>faraga1/xiaomi-scale-s200-ble (プロトコル全容, scale_reader.py, webhook)</li>
+<li>zoup0512/BleWeightScale (Android, 広告復号, フォーマット表)</li>
+<li>kfirmaymon84/esp32-mirror-weight-tracker (ESP32, GATT 方式)</li>
+<li>HA Xiaomi BLE 統合 (2026.1〜 S200 パッシブ対応)</li>
+</ul>
+<p class="doc-meta">generated from RESEARCH.md</p>
+</main>
+</body>
+</html>

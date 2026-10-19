@@ -1,0 +1,16 @@
+# config.toml にコピーして値を埋める（config.toml は git 管理外）
+[scale]
+# Xiaomi-cloud-tokens-extractor の "BLE KEY"（32 桁の16進）。TOKEN(24桁)ではない
+bindkey = "00000000000000000000000000000000"
+# 体重計の MAC アドレス（macOS は実アドレスを隠すので必須）
+mac = "AA:BB:CC:DD:EE:FF"
+# 記録する体重計側のユーザー番号。省略すると全員分を記録
+# profile_id = 1
+
+[user]
+height_cm = 170
+goal_kg = 65.0
+
+[server]
+db_path = "weights.sqlite3"
+port = 8200
