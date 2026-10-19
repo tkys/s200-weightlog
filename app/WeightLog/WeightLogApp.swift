@@ -8,9 +8,9 @@ struct WeightLogApp: App {
         Window("体重ログ", id: "main") {
             MainView()
                 .environment(model)
-                .frame(minWidth: 940, minHeight: 680)
+                .frame(minWidth: 880, minHeight: 600)
         }
-        .defaultSize(width: 1180, height: 860)
+        .defaultSize(width: 1120, height: 760)
 
         MenuBarExtra {
             MenuBarView()

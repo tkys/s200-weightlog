@@ -32,8 +32,8 @@ struct TrendChartView: View {
     private var selected: Reading? { hovered ?? pinned }
 
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     SectionTitle(title: "推移", symbol: "chart.xyaxis.line")
                     Spacer()
@@ -47,13 +47,14 @@ struct TrendChartView: View {
 
                 if visible.isEmpty {
                     ContentUnavailableView("この期間の記録はありません", systemImage: "chart.line.downtrend.xyaxis")
-                        .frame(height: 300)
+                        .frame(maxHeight: .infinity)
                 } else {
                     chart
-                        .frame(height: 300)
+                        .frame(minHeight: 180, maxHeight: .infinity)
                     selectionBar
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .onChange(of: model.readings) { _, readings in
             if let p = pinned { pinned = readings.first { $0.id == p.id } }

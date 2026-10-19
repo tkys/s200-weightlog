@@ -1,21 +1,18 @@
 import SwiftUI
 
-/// The big latest-weight card with deltas and the daemon's comment.
+/// Latest weight, deltas and the daemon's comment in one compact row.
 struct HeroCard: View {
     @Environment(AppModel.self) private var model
     @State private var shown: Double = 0
 
     var body: some View {
-        Card(padding: 28) {
+        Card(padding: 18) {
             if let summary = model.summary, let latest = summary.latest {
                 content(summary, latest)
             } else {
-                ContentUnavailableView(
-                    "まだ記録がありません",
-                    systemImage: "scalemass",
-                    description: Text("体重計に乗ると、ここに結果が出ます")
-                )
-                .frame(maxWidth: .infinity, minHeight: 220)
+                Label("まだ記録がありません。体重計に乗ると、ここに結果が出ます", systemImage: "scalemass")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 90)
             }
         }
         .onChange(of: model.summary?.latest?.weightKg, initial: true) { _, new in
@@ -26,78 +23,76 @@ struct HeroCard: View {
 
     @ViewBuilder
     private func content(_ summary: Summary, _ latest: Reading) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 8) {
-                Text("最新")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(Format.dateTime(latest.date))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                StatusBadge(reading: latest)
+        HStack(alignment: .center, spacing: 24) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(Format.dateTime(latest.date))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    StatusBadge(reading: latest)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    CountingNumber(value: shown)
+                        .font(.system(size: 56, weight: .bold, design: .rounded))
+                        .foregroundStyle(latest.status.isIncluded ? .primary : .secondary)
+                    Text("kg")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
             }
+            .fixedSize()
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                CountingNumber(value: shown)
-                    .font(.system(size: 84, weight: .bold, design: .rounded))
-                    .foregroundStyle(latest.status.isIncluded ? .primary : .secondary)
-                Text("kg")
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 DeltaChip(title: "前回比", delta: summary.deltaPrev)
                 DeltaChip(title: "スタート比", delta: summary.deltaStart)
-                DeltaChip(title: "トレンド 7日", delta: summary.deltaTrendWeek)
             }
+            .fixedSize()
 
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "sparkles")
                     .foregroundStyle(Palette.trend)
                 Text(summary.comment)
-                    .font(.title3.weight(.medium))
+                    .font(.body.weight(.medium))
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(14)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.trend.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
 
-/// Small stat tiles next to the hero.
-struct StatsGrid: View {
+/// Four key numbers in one row; secondary stats ride along as captions.
+struct StatsRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let s = model.summary
-        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-            GridRow {
-                StatTile(title: "トレンド体重", value: Format.kg(s?.trendKg), unit: "kg", symbol: "waveform.path.ecg")
-                StatTile(
-                    title: "ペース",
-                    value: Format.signed(s?.paceKgPerWeek),
-                    unit: "kg/週",
-                    symbol: Trend(s?.paceKgPerWeek).symbol,
-                    tint: s?.paceKgPerWeek == nil ? nil : Palette.color(for: Trend(s?.paceKgPerWeek))
-                )
-            }
-            GridRow {
-                StatTile(
-                    title: "目標まで",
-                    value: goalRemaining(s),
-                    unit: s?.goalKg == nil ? "" : "kg",
-                    symbol: "flag.checkered",
-                    caption: s?.etaDate.map { "予定 \(Format.day($0))" } ?? (s?.goalKg.map { "目標 \(Format.kg($0, digits: 1)) kg" })
-                )
-                StatTile(title: "連続記録", value: "\(s?.streakDays ?? 0)", unit: "日", symbol: "flame.fill",
-                         tint: (s?.streakDays ?? 0) >= 3 ? Palette.trend : nil)
-            }
-            GridRow {
-                StatTile(title: "BMI", value: s?.bmi.map { Format.kg($0, digits: 1) } ?? "–", unit: "", symbol: "figure.stand")
-                StatTile(title: "最安値", value: Format.kg(s?.lowestKg), unit: "kg", symbol: "trophy.fill")
-            }
+        HStack(spacing: 12) {
+            StatTile(
+                title: "トレンド体重", value: Format.kg(s?.trendKg), unit: "kg", symbol: "waveform.path.ecg",
+                caption: s?.deltaTrendWeek.map { "7日で \(Format.signed($0)) kg" } ?? "日々の増減をならした値"
+            )
+            StatTile(
+                title: "ペース", value: Format.signed(s?.paceKgPerWeek), unit: "kg/週",
+                symbol: Trend(s?.paceKgPerWeek).symbol,
+                caption: s?.paceKgPerWeek == nil ? "数日分の記録で表示" : "直近14日",
+                tint: s?.paceKgPerWeek == nil ? nil : Palette.color(for: Trend(s?.paceKgPerWeek))
+            )
+            StatTile(
+                title: "目標まで", value: goalRemaining(s), unit: s?.goalKg == nil ? "" : "kg",
+                symbol: "flag.checkered",
+                caption: s?.etaDate.map { "予定 \(Format.day($0))" }
+                    ?? s?.goalKg.map { "目標 \(Format.kg($0, digits: 1)) kg" } ?? "設定で目標を入力"
+            )
+            StatTile(
+                title: "連続記録", value: "\(s?.streakDays ?? 0)", unit: "日", symbol: "flame.fill",
+                caption: [s?.bmi.map { "BMI \(Format.kg($0, digits: 1))" },
+                          s?.lowestKg.map { "最安 \(Format.kg($0, digits: 1))" }]
+                    .compactMap { $0 }.joined(separator: " · "),
+                tint: (s?.streakDays ?? 0) >= 3 ? Palette.trend : nil
+            )
         }
     }
 
@@ -117,23 +112,24 @@ struct StatTile: View {
     var tint: Color?
 
     var body: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 6) {
+        Card(padding: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Label(title, systemImage: symbol)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(tint ?? .secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(value)
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .contentTransition(.numericText())
                     Text(unit)
-                        .font(.callout)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Text(caption ?? " ")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }
