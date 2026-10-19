@@ -10,12 +10,6 @@ dependencies = [
 
 [project.scripts]
 s200 = "s200.cli:main"
-s200-desktop = "s200.desktop:main"
-
-[project.optional-dependencies]
-desktop = [
-    "pywebview>=6.2.1",
-]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]

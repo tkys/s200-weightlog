@@ -3,203 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>体重ログ</title>
+<title>体重ログ API</title>
 <style>
-  :root {
-    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
-    --line: #e5e5ea; --accent: #2f6fde; --avg: #e0742b; --goal: #2a9d5c; --down: #2a9d5c; --up: #d64545;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #111113; --card: #1c1c1f; --text: #f2f2f7; --muted: #9a9aa0;
-      --line: #2c2c31; --accent: #6b9cff; --avg: #ff9a52; --goal: #4cc282; --down: #4cc282; --up: #ff6b6b;
-    }
-  }
-  * { box-sizing: border-box; }
+  :root { --bg: #f7f7f5; --text: #1d1d1f; --muted: #6e6e73; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111113; --text: #f2f2f7; --muted: #9a9aa0; } }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; }
-  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 20px; margin: 0 0 16px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-  .tile, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .label { color: var(--muted); font-size: 12px; }
-  .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .sub { color: var(--muted); font-size: 12px; }
-  .down { color: var(--down); } .up { color: var(--up); }
-  .card { margin-top: 16px; }
-  .ranges { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-  .ranges button { border: 1px solid var(--line); background: transparent; color: var(--text);
-                   border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
-  .ranges button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .chart-wrap { position: relative; height: 320px; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 500; font-size: 12px; }
-  .empty { color: var(--muted); padding: 32px 0; text-align: center; }
+         font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+  .big { font-size: 48px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  code { font-size: 13px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>体重ログ</h1>
-  <section class="tiles">
-    <div class="tile"><div class="label">最新</div><div class="value" id="latest">–</div><div class="sub" id="latest-at"></div></div>
-    <div class="tile"><div class="label">7日平均</div><div class="value" id="avg7">–</div><div class="sub" id="avg7-diff"></div></div>
-    <div class="tile"><div class="label">BMI</div><div class="value" id="bmi">–</div><div class="sub" id="bmi-class"></div></div>
-    <div class="tile"><div class="label">目標まで</div><div class="value" id="goal">–</div><div class="sub" id="goal-sub"></div></div>
-  </section>
-
-  <section class="card">
-    <div class="ranges" id="ranges">
-      <button data-days="30" aria-pressed="true">30日</button>
-      <button data-days="90" aria-pressed="false">90日</button>
-      <button data-days="365" aria-pressed="false">1年</button>
-      <button data-days="0" aria-pressed="false">全期間</button>
-    </div>
-    <div class="chart-wrap"><canvas id="chart"></canvas></div>
-    <div class="empty" id="empty" hidden>まだ記録がありません。体重計に乗ると自動で記録されます。</div>
-  </section>
-
-  <section class="card">
-    <table>
-      <thead><tr><th>日時</th><th>体重</th><th>前回比</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-  </section>
+  <p class="muted">体重ログ API は動作中です。表示は WeightLog アプリで。</p>
+  <div class="big" id="w">–</div>
+  <p id="c" class="muted"></p>
+  <p class="muted"><code>/api/summary</code> · <code>/api/readings</code> · <code>/api/notes</code> · <code>/api/settings</code> · <code>/api/stream</code></p>
 </main>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const DAY = 86400;
-let data = { readings: [], height_cm: null, goal_kg: null };
-let rangeDays = 30;
-let chart;
-
-const fmtKg = v => v == null ? "–" : v.toFixed(2);
-const fmtDate = ts => new Date(ts * 1000).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" });
-const fmtDateTime = ts => new Date(ts * 1000).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-function movingAverage(readings, windowDays = 7) {
-  return readings.map(r => {
-    const win = readings.filter(x => x.ts > r.ts - windowDays * DAY && x.ts <= r.ts);
-    return win.reduce((s, x) => s + x.weight_kg, 0) / win.length;
-  });
-}
-
-function avgBetween(readings, from, to) {
-  const win = readings.filter(r => r.ts > from && r.ts <= to);
-  return win.length ? win.reduce((s, r) => s + r.weight_kg, 0) / win.length : null;
-}
-
-function bmiClass(bmi) {
-  if (bmi < 18.5) return "低体重";
-  if (bmi < 25) return "普通体重";
-  if (bmi < 30) return "肥満(1度)";
-  return "肥満(2度以上)";
-}
-
-function setDiff(el, diff, suffix) {
-  if (diff == null) { el.textContent = ""; el.className = "sub"; return; }
-  el.textContent = `${diff > 0 ? "+" : ""}${diff.toFixed(2)} kg ${suffix}`;
-  el.className = "sub " + (diff < 0 ? "down" : diff > 0 ? "up" : "");
-}
-
-function renderTiles() {
-  const rs = data.readings;
-  if (!rs.length) return;
-  const last = rs[rs.length - 1];
-  const now = Date.now() / 1000;
-  document.getElementById("latest").textContent = fmtKg(last.weight_kg);
-  document.getElementById("latest-at").textContent = fmtDateTime(last.ts);
-
-  const avg7 = avgBetween(rs, now - 7 * DAY, now);
-  const prev7 = avgBetween(rs, now - 14 * DAY, now - 7 * DAY);
-  document.getElementById("avg7").textContent = fmtKg(avg7);
-  setDiff(document.getElementById("avg7-diff"), avg7 != null && prev7 != null ? avg7 - prev7 : null, "前週比");
-
-  if (data.height_cm) {
-    const bmi = last.weight_kg / (data.height_cm / 100) ** 2;
-    document.getElementById("bmi").textContent = bmi.toFixed(1);
-    document.getElementById("bmi-class").textContent = bmiClass(bmi);
-  }
-  if (data.goal_kg) {
-    const rest = last.weight_kg - data.goal_kg;
-    document.getElementById("goal").textContent = rest > 0 ? rest.toFixed(2) : "達成";
-    document.getElementById("goal-sub").textContent = `目標 ${data.goal_kg.toFixed(1)} kg`;
-  }
-}
-
-function renderChart() {
-  const now = Date.now() / 1000;
-  const rs = rangeDays ? data.readings.filter(r => r.ts >= now - rangeDays * DAY) : data.readings;
-  const empty = !rs.length;
-  document.getElementById("empty").hidden = !empty;
-  document.querySelector(".chart-wrap").hidden = empty;
-  if (empty || !window.Chart) return;
-
-  const avg = movingAverage(data.readings);
-  const avgById = new Map(data.readings.map((r, i) => [r.ts, avg[i]]));
-  const datasets = [
-    { label: "体重", data: rs.map(r => ({ x: r.ts, y: r.weight_kg })),
-      borderColor: css("--accent"), backgroundColor: css("--accent"), showLine: false, pointRadius: 3 },
-    { label: "7日移動平均", data: rs.map(r => ({ x: r.ts, y: avgById.get(r.ts) })),
-      borderColor: css("--avg"), borderWidth: 2, pointRadius: 0, tension: 0.3 },
-  ];
-  if (data.goal_kg) {
-    datasets.push({ label: "目標", data: [{ x: rs[0].ts, y: data.goal_kg }, { x: rs[rs.length - 1].ts, y: data.goal_kg }],
-      borderColor: css("--goal"), borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 });
-  }
-
-  chart?.destroy();
-  chart = new Chart(document.getElementById("chart"), {
-    type: "line",
-    data: { datasets },
-    options: {
-      maintainAspectRatio: false,
-      interaction: { mode: "nearest", intersect: false },
-      scales: {
-        x: { type: "linear", ticks: { callback: fmtDate, color: css("--muted"), maxTicksLimit: 8 }, grid: { color: css("--line") } },
-        y: { ticks: { color: css("--muted") }, grid: { color: css("--line") } },
-      },
-      plugins: {
-        legend: { labels: { color: css("--text") } },
-        tooltip: { callbacks: { title: items => fmtDateTime(items[0].parsed.x), label: i => `${i.dataset.label}: ${i.parsed.y.toFixed(2)} kg` } },
-      },
-    },
-  });
-}
-
-function renderTable() {
-  const rows = data.readings.slice(-30).reverse();
-  document.getElementById("rows").innerHTML = rows.map((r, i) => {
-    const prev = rows[i + 1];
-    const diff = prev ? r.weight_kg - prev.weight_kg : null;
-    const cls = diff == null ? "" : diff < 0 ? "down" : diff > 0 ? "up" : "";
-    const txt = diff == null ? "" : `${diff > 0 ? "+" : ""}${diff.toFixed(2)}`;
-    return `<tr><td>${fmtDateTime(r.ts)}</td><td>${fmtKg(r.weight_kg)} kg</td><td class="${cls}">${txt}</td></tr>`;
-  }).join("");
-}
-
 async function load() {
   try {
-    const res = await fetch("/api/readings");
-    data = await res.json();
-  } catch (e) {
-    console.error(e);
-  }
-  renderTiles(); renderChart(); renderTable();
+    const s = await (await fetch("/api/summary")).json();
+    document.getElementById("w").textContent = s.latest ? `${s.latest.weight_kg.toFixed(2)} kg` : "–";
+    document.getElementById("c").textContent = s.comment;
+  } catch (e) { console.error(e); }
 }
-
-document.getElementById("ranges").addEventListener("click", e => {
-  const btn = e.target.closest("button");
-  if (!btn) return;
-  rangeDays = Number(btn.dataset.days);
-  document.querySelectorAll("#ranges button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
-  renderChart();
-});
-
 load();
-setInterval(load, 60_000);
+const es = new EventSource("/api/stream");
+["reading", "changed"].forEach(t => es.addEventListener(t, load));
 </script>
 </body>
 </html>

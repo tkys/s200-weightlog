@@ -24,25 +24,27 @@ def cmd_scan(args: argparse.Namespace) -> None:
 def cmd_run(args: argparse.Namespace) -> None:
     cfg = config_mod.load(args.config)
     store = Store(cfg.db_path)
-
-    server = web.make_server(
+    app = web.WeightApp(
         store,
-        args.host,
-        cfg.port,
         profile_id=cfg.profile_id,
-        height_cm=cfg.height_cm,
-        goal_kg=cfg.goal_kg,
+        defaults={"height_cm": cfg.height_cm, "goal_kg": cfg.goal_kg},
     )
+
+    server = web.make_server(app, args.host, cfg.port)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    log.info("dashboard: http://%s:%d/", args.host, cfg.port)
+    log.info("api: http://%s:%d/", args.host, cfg.port)
 
     def on_reading(reading: Reading) -> None:
-        if cfg.profile_id is not None and reading.profile_id != cfg.profile_id:
-            return
-        if store.add(reading):
+        row = app.ingest(reading)
+        if row is not None:
             when = datetime.fromtimestamp(reading.timestamp).isoformat(sep=" ")
             log.info(
-                "recorded %.2f kg (profile %d) at %s", reading.weight_kg, reading.profile_id, when
+                "recorded %.2f kg (profile %d) at %s [%s%s]",
+                reading.weight_kg,
+                reading.profile_id,
+                when,
+                row["status"],
+                f": {row['reason']}" if row["reason"] else "",
             )
 
     log.info("listening for S200 broadcasts...")
