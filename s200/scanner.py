@@ -10,7 +10,14 @@ from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-from s200.mibeacon import SERVICE_UUID, Reading, decode_s200, parse_frame, parse_mac
+from s200.mibeacon import (
+    S200_PRODUCT_IDS,
+    SERVICE_UUID,
+    Reading,
+    decode_s200,
+    parse_frame,
+    parse_mac,
+)
 
 log = logging.getLogger(__name__)
 
@@ -32,22 +39,58 @@ async def watch(
     mac: bytes,
     on_reading: Callable[[Reading], None],
     stop: asyncio.Event | None = None,
+    *,
+    stale_after: float = 600,
+    check_every: float = 30,
+    heartbeat_every: float = 3600,
 ) -> None:
-    """Scan forever (or until `stop` is set), calling on_reading per decoded weigh-in."""
+    """Scan forever (or until `stop` is set), calling on_reading per decoded weigh-in.
+
+    CoreBluetooth scans can go quiet after running for hours. The S200 keeps
+    sending idle frames, so if nothing from it arrives for `stale_after`
+    seconds the scanner is torn down and started again.
+    """
+    stop = stop or asyncio.Event()
+    loop = asyncio.get_running_loop()
+    last_seen = loop.time()
+    frames = 0
 
     def callback(device: BLEDevice, adv: AdvertisementData) -> None:
+        nonlocal last_seen, frames
         data = adv.service_data.get(SERVICE_UUID)
         if not data:
             return
+        frame = parse_frame(data)
+        if frame is None or frame.product_id not in S200_PRODUCT_IDS:
+            return
+        last_seen = loop.time()
+        frames += 1
         macs = [mac]
         if (addr := _address_mac(device)) is not None:
             macs.append(addr)
         reading = decode_s200(data, bindkey, macs)
         if reading is not None:
             on_reading(reading)
+        elif frame.has_object and frame.encrypted:
+            log.warning("S200 object frame could not be decoded: %s", data.hex())
 
-    async with BleakScanner(detection_callback=callback):
-        await (stop or asyncio.Event()).wait()
+    next_heartbeat = loop.time() + heartbeat_every
+    while not stop.is_set():
+        last_seen = loop.time()
+        async with BleakScanner(detection_callback=callback):
+            while not stop.is_set():
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=check_every)
+                except TimeoutError:
+                    pass
+                now = loop.time()
+                if now >= next_heartbeat:
+                    log.info("heartbeat: %d S200 frames in the last hour", frames)
+                    frames = 0
+                    next_heartbeat = now + heartbeat_every
+                if now - last_seen > stale_after:
+                    log.warning("no S200 frames for %.0f s, restarting scanner", now - last_seen)
+                    break
 
 
 async def dump(seconds: float) -> None:
