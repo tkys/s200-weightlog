@@ -6,6 +6,7 @@ from s200.mibeacon import (
     Reading,
     decode_s200,
     decode_weight,
+    decrypt_objects,
     iter_objects,
     parse_frame,
     parse_mac,
@@ -97,3 +98,12 @@ def test_ms114_product_0x4dcc_decodes():
     obj = b"\x16\x4e\x09" + struct.pack("<BII", 1, 7440, 1_792_402_176)
     adv = _encrypt_frame(0x4DCC, 2, obj, mac, key)
     assert decode_s200(adv, key, [mac]) == Reading(1, 74.4, 1_792_402_176)
+
+
+def test_decrypt_objects_returns_status_object():
+    key = bytes(range(16))
+    mac = parse_mac("D0:7B:6F:00:00:01")
+    adv = _encrypt_frame(0x4DCC, 5, bytes.fromhex("23660100"), mac, key)
+    assert decrypt_objects(adv, key, [mac]) == [(0x6623, b"\x00")]
+    assert decrypt_objects(adv, bytes(16), [mac]) is None
+    assert decode_s200(adv, key, [mac]) is None

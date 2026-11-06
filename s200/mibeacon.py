@@ -113,13 +113,15 @@ def decode_weight(value: bytes) -> Reading | None:
     return Reading(profile_id=profile_id, weight_kg=raw / 100.0, timestamp=timestamp)
 
 
-def decode_s200(
+def decrypt_objects(
     data: bytes, bindkey: bytes, macs: list[bytes] | tuple[bytes, ...] = ()
-) -> Reading | None:
-    """Decode an S200 service-data payload into a Reading.
+) -> list[tuple[int, bytes]] | None:
+    """Decrypt an S200 object frame into its (type, value) objects.
 
-    `macs` are candidate scale MACs to try for the nonce (macOS hides the real
-    address, so the configured MAC is required unless the frame carries one).
+    Returns None when the frame is not an encrypted S200 object frame or no
+    candidate MAC decrypts it. `macs` are candidate scale MACs for the nonce
+    (macOS hides the real address, so the configured MAC is required unless
+    the frame carries one).
     """
     frame = parse_frame(data)
     if frame is None or frame.product_id not in S200_PRODUCT_IDS:
@@ -130,10 +132,16 @@ def decode_s200(
     candidates = ([frame.mac] if frame.mac else []) + [m for m in macs if m != frame.mac]
     for mac in candidates:
         payload = decrypt(data, frame, mac, bindkey)
-        if payload is None:
-            continue
-        for obj_type, value in iter_objects(payload):
-            if obj_type == OBJ_WEIGHT:
-                return decode_weight(value)
-        return None
+        if payload is not None:
+            return list(iter_objects(payload))
+    return None
+
+
+def decode_s200(
+    data: bytes, bindkey: bytes, macs: list[bytes] | tuple[bytes, ...] = ()
+) -> Reading | None:
+    """Decode an S200 service-data payload into a Reading (None if it holds no weight)."""
+    for obj_type, value in decrypt_objects(data, bindkey, macs) or ():
+        if obj_type == OBJ_WEIGHT:
+            return decode_weight(value)
     return None

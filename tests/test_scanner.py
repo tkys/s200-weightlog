@@ -27,7 +27,7 @@ class FakeScanner:
     async def _replay(self):
         for delay, data in FakeScanner.script:
             await asyncio.sleep(delay)
-            self.callback(DEVICE, SimpleNamespace(service_data={SERVICE_UUID: data}))
+            self.callback(DEVICE, SimpleNamespace(service_data={SERVICE_UUID: data}, rssi=-53))
 
     async def __aenter__(self):
         self.task = asyncio.create_task(self._replay())
@@ -64,7 +64,7 @@ def test_watch_delivers_weigh_in(monkeypatch):
 
 
 def test_watch_restarts_scanner_when_frames_stop(monkeypatch, caplog):
-    caplog.set_level(logging.WARNING)
+    caplog.set_level(logging.DEBUG)
     # One idle frame then silence: each scanner goes stale and is replaced.
     _run(monkeypatch, [(0.0, IDLE)], 0.35, stale_after=0.08, check_every=0.02)
     assert len(FakeScanner.instances) >= 2
@@ -77,12 +77,28 @@ def test_watch_keeps_scanner_while_frames_flow(monkeypatch):
     assert len(FakeScanner.instances) == 1
 
 
-def test_watch_warns_on_undecodable_object_frame(monkeypatch, caplog):
+def test_watch_warns_when_frame_does_not_decrypt(monkeypatch, caplog):
     caplog.set_level(logging.WARNING)
     bad = _encrypt_frame(0x4DCC, 3, b"\x16\x4e\x09" + bytes(9), MAC, bytes(16))  # wrong key
     readings = _run(monkeypatch, [(0.01, bad)], 0.05)
     assert readings == []
-    assert "could not be decoded" in caplog.text
+    assert "could not be decrypted" in caplog.text
+
+
+def test_watch_ignores_status_object_quietly(monkeypatch, caplog):
+    # The S200 sends object 0x6623 about every 50 minutes; it is not a weigh-in.
+    caplog.set_level(logging.WARNING)
+    status = _encrypt_frame(0x4DCC, 4, bytes.fromhex("23660100"), MAC, KEY)
+    readings = _run(monkeypatch, [(0.01, status)], 0.05)
+    assert readings == []
+    assert caplog.text == ""
+
+
+def test_watch_logs_scale_waking_once_per_burst(monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    script = [(0.01, IDLE)] * 3 + [(0.1, IDLE)]
+    _run(monkeypatch, script, 0.2, awake_gap=0.05)
+    assert caplog.text.count("scale awake: counter=83") == 2
 
 
 def test_watch_logs_heartbeat(monkeypatch, caplog):

@@ -5,7 +5,10 @@
   <key>Label</key>
   <string>com.user.s200</string>
   <key>ProgramArguments</key>
+  <!-- caffeinate -i: the Mac must not idle-sleep, or BLE scanning stops and weigh-ins are lost -->
   <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-i</string>
     <string>/Users/m1macmini/playground/BLE-huawai-s200/.venv/bin/s200</string>
     <string>run</string>
     <string>--config</string>

@@ -11,10 +11,12 @@ from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
 from s200.mibeacon import (
+    OBJ_WEIGHT,
     S200_PRODUCT_IDS,
     SERVICE_UUID,
     Reading,
-    decode_s200,
+    decode_weight,
+    decrypt_objects,
     parse_frame,
     parse_mac,
 )
@@ -43,36 +45,50 @@ async def watch(
     stale_after: float = 600,
     check_every: float = 30,
     heartbeat_every: float = 3600,
+    awake_gap: float = 300,
 ) -> None:
     """Scan forever (or until `stop` is set), calling on_reading per decoded weigh-in.
 
-    CoreBluetooth scans can go quiet after running for hours. The S200 keeps
-    sending idle frames, so if nothing from it arrives for `stale_after`
-    seconds the scanner is torn down and started again.
+    The S200 sleeps between weigh-ins (plus a status frame roughly every 50
+    minutes), so the first frame after `awake_gap` seconds of silence is
+    logged: a step-on then shows up even if its weight frame is missed.
+    CoreBluetooth scans can also go quiet after running for hours, so after
+    `stale_after` seconds without frames the scanner is started again.
     """
     stop = stop or asyncio.Event()
     loop = asyncio.get_running_loop()
     last_seen = loop.time()
-    frames = 0
+    last_frame = float("-inf")
+    frames = restarts = 0
 
     def callback(device: BLEDevice, adv: AdvertisementData) -> None:
-        nonlocal last_seen, frames
+        nonlocal last_seen, last_frame, frames
         data = adv.service_data.get(SERVICE_UUID)
         if not data:
             return
         frame = parse_frame(data)
         if frame is None or frame.product_id not in S200_PRODUCT_IDS:
             return
-        last_seen = loop.time()
+        now = loop.time()
+        if now - last_frame > awake_gap:
+            log.info("scale awake: counter=%d rssi=%s", frame.counter, adv.rssi)
+        last_seen = last_frame = now
         frames += 1
+        if not (frame.has_object and frame.encrypted):
+            return
         macs = [mac]
         if (addr := _address_mac(device)) is not None:
             macs.append(addr)
-        reading = decode_s200(data, bindkey, macs)
-        if reading is not None:
-            on_reading(reading)
-        elif frame.has_object and frame.encrypted:
-            log.warning("S200 object frame could not be decoded: %s", data.hex())
+        objects = decrypt_objects(data, bindkey, macs)
+        if objects is None:
+            log.warning("S200 frame could not be decrypted (bindkey/MAC?): %s", data.hex())
+            return
+        for obj_type, value in objects:
+            if obj_type == OBJ_WEIGHT:
+                if (reading := decode_weight(value)) is not None:
+                    on_reading(reading)
+            else:
+                log.debug("S200 object 0x%04x: %s", obj_type, value.hex())
 
     next_heartbeat = loop.time() + heartbeat_every
     while not stop.is_set():
@@ -85,11 +101,16 @@ async def watch(
                     pass
                 now = loop.time()
                 if now >= next_heartbeat:
-                    log.info("heartbeat: %d S200 frames in the last hour", frames)
-                    frames = 0
+                    log.info(
+                        "heartbeat: %d S200 frames, %d scanner restarts in the last hour",
+                        frames,
+                        restarts,
+                    )
+                    frames = restarts = 0
                     next_heartbeat = now + heartbeat_every
                 if now - last_seen > stale_after:
-                    log.warning("no S200 frames for %.0f s, restarting scanner", now - last_seen)
+                    log.debug("no S200 frames for %.0f s, restarting scanner", now - last_seen)
+                    restarts += 1
                     break
 
 
