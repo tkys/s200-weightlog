@@ -10,6 +10,28 @@ from s200.mibeacon import parse_mac
 
 
 @dataclass(frozen=True)
+class DriveConfig:
+    enabled: bool = False
+    folder: str = "体重ログ"
+    backup_keep: int = 30
+    debounce_seconds: float = 60
+    # client_secret.json, token.json and state.json live here (git-ignored)
+    dir: Path = Path(".drive")
+
+    @property
+    def client_secret(self) -> Path:
+        return self.dir / "client_secret.json"
+
+    @property
+    def token(self) -> Path:
+        return self.dir / "token.json"
+
+    @property
+    def state(self) -> Path:
+        return self.dir / "state.json"
+
+
+@dataclass(frozen=True)
 class Config:
     bindkey: bytes
     mac: bytes
@@ -18,6 +40,7 @@ class Config:
     goal_kg: float | None
     db_path: Path
     port: int
+    drive: DriveConfig = DriveConfig()
 
 
 def load(path: str | Path) -> Config:
@@ -27,6 +50,7 @@ def load(path: str | Path) -> Config:
     scale = raw.get("scale", {})
     user = raw.get("user", {})
     server = raw.get("server", {})
+    drive = raw.get("drive", {})
 
     bindkey = bytes.fromhex(scale.get("bindkey", ""))
     if len(bindkey) != 16:
@@ -36,6 +60,10 @@ def load(path: str | Path) -> Config:
     if not db_path.is_absolute():
         db_path = path.parent / db_path
 
+    drive_dir = Path(drive.get("dir", ".drive"))
+    if not drive_dir.is_absolute():
+        drive_dir = path.parent / drive_dir
+
     return Config(
         bindkey=bindkey,
         mac=parse_mac(scale.get("mac", "")),
@@ -44,4 +72,11 @@ def load(path: str | Path) -> Config:
         goal_kg=user.get("goal_kg"),
         db_path=db_path,
         port=int(server.get("port", 8200)),
+        drive=DriveConfig(
+            enabled=bool(drive.get("enabled", False)),
+            folder=str(drive.get("folder", "体重ログ")),
+            backup_keep=int(drive.get("backup_keep", 30)),
+            debounce_seconds=float(drive.get("debounce_seconds", 60)),
+            dir=drive_dir,
+        ),
     )

@@ -38,6 +38,23 @@ let summaryJSON = """
         #expect(r.settings.goalKg == nil)
     }
 
+    @Test func decodesDriveStatus() throws {
+        let decoder = WireCoding.decoder()
+        let off = try decoder.decode(DriveStatus.self, from: Data(#"{"enabled": false}"#.utf8))
+        #expect(off.line == .off)
+
+        let ok = try decoder.decode(DriveStatus.self, from: Data(
+            #"{"enabled": true, "last_success": 1793918715, "last_error": null}"#.utf8))
+        #expect(ok.line == .synced(Date(timeIntervalSince1970: 1_793_918_715)))
+
+        let failing = try decoder.decode(DriveStatus.self, from: Data(
+            #"{"enabled": true, "last_success": 1793918715, "last_error": "500"}"#.utf8))
+        #expect(failing.line == .error("500"))
+
+        let fresh = try decoder.decode(DriveStatus.self, from: Data(#"{"enabled": true}"#.utf8))
+        #expect(fresh.line == .waiting)
+    }
+
     @Test func encodesSettingsSnakeCase() throws {
         let data = try WireCoding.encoder().encode(BodySettings(heightCm: 172, goalKg: 68))
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Double]

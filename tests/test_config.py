@@ -36,3 +36,29 @@ def test_rejects_token_in_bindkey_slot(tmp_path):
 
 def test_example_config_parses():
     assert load("config.example.toml").port == 8200
+
+
+def test_drive_defaults_to_disabled(tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text(VALID)
+    drive = load(path).drive
+    assert drive.enabled is False
+    assert drive.folder == "体重ログ"
+    assert drive.token == tmp_path / ".drive" / "token.json"
+
+
+def test_drive_section(tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text(
+        VALID
+        + '[drive]\nenabled = true\nfolder = "Weights"\nbackup_keep = 7\n'
+        + 'debounce_seconds = 5\ndir = "/secure/drive"\n'
+    )
+    drive = load(path).drive
+    assert (drive.enabled, drive.folder, drive.backup_keep, drive.debounce_seconds) == (
+        True,
+        "Weights",
+        7,
+        5.0,
+    )
+    assert str(drive.client_secret) == "/secure/drive/client_secret.json"

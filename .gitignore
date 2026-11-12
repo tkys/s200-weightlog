@@ -7,3 +7,4 @@ config.toml
 *.sqlite3
 logs/
 backups/
+.drive/

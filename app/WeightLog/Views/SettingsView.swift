@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var launchError: String?
     @State private var saved = false
+    @State private var drive: DriveStatus?
 
     var body: some View {
         Form {
@@ -29,6 +30,7 @@ struct SettingsView: View {
                     Text(model.isConnected ? "接続中" : "未接続")
                         .foregroundStyle(model.isConnected ? Palette.down : .secondary)
                 }
+                LabeledContent("Google Drive") { driveLabel }
             }
             HStack {
                 if saved {
@@ -48,7 +50,34 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .onAppear { draft = model.settings }
+        .task {
+            // Poll while the window is open; the upload runs in the daemon.
+            while !Task.isCancelled {
+                drive = try? await APIClient.local.driveStatus()
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
         .onChange(of: draft) { saved = false }
+    }
+
+    @ViewBuilder
+    private var driveLabel: some View {
+        switch drive?.line {
+        case nil:
+            Text("–").foregroundStyle(.secondary)
+        case .off:
+            Text("オフ（config.toml の [drive]）").foregroundStyle(.secondary)
+        case .waiting:
+            Text("同期待ち").foregroundStyle(.secondary)
+        case .synced(let date):
+            Text("最終同期 \(Format.relative(date))").foregroundStyle(Palette.down)
+        case .error(let message):
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .lineLimit(2)
+                .help(message)
+        }
     }
 
     private func setLaunchAtLogin(_ on: Bool) {

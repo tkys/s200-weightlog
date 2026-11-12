@@ -204,6 +204,15 @@ class Store:
                     (key, json.dumps(value)),
                 )
 
+    def snapshot(self, path: str | Path) -> None:
+        """Write a consistent copy of the database to `path` (for backups)."""
+        dest = sqlite3.connect(str(path))
+        try:
+            with self.lock:
+                self.conn.backup(dest)
+        finally:
+            dest.close()
+
     def close(self) -> None:
         self.conn.close()
 

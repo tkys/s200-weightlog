@@ -86,3 +86,93 @@ WeightLogTests/             # Swift Testing
 - XcodeBuildMCP は接続に失敗しているため、`xcodebuild` を直接使う
 - スクリーンショットが撮れない（画面収録の許可がない）ので、見た目の確認はユーザーにお願いする
 - SSE の接続が切れても、アプリ側で再接続し、summary を再取得するので取りこぼさない
+
+
+---
+
+# v3: 体重ログ → Google Drive 自動アップロード
+
+## Context
+今の体重記録は Mac mini の SQLite（`weights.sqlite3`）にしかない。Google Drive に自動で上げて、次の4つに使えるようにする。
+- **バックアップ**
+- **スマホなどで見る**
+- **スプレッドシートで分析**
+- **ほかのサービスや AI との連携**（食事・歩数と日付で突き合わせる）
+
+決めたこと：
+- **Drive API で直接アップロードする。** Drive のデスクトップアプリは入っていない。
+- 権限は **`drive.file`** にする。このアプリが作ったファイルしか触れず、Drive のほかのファイルは見えない。
+
+## Drive 上の構成（マイドライブ/体重ログ/）
+| ファイル | 中身 | 用途 |
+|---|---|---|
+| `weights`（スプレッドシート）＋ `weights.csv` | 全記録：`id, datetime, date, weight_kg, trend_kg, status, reason, profile_id` | 閲覧、分析 |
+| `daily`（スプレッドシート）＋ `daily.csv` | 1日1行：`date, weight_kg`（その日最後の有効な記録）`, trend_kg, count, note, tags` | AI 連携。`date` をキーにして、食事・歩数と結合する |
+| `backups/weights-YYYY-MM-DD.sqlite3` | 1日1回の DB のスナップショット。直近30個を残す | バックアップ |
+
+- 列名は英語の snake_case にする。AI やほかのツールが読みやすく、あとから変わらないため。
+- スプレッドシートは、CSV を「変換付き」で同じファイル ID に上書きする。中身は全部入れ替わり、URL は変わらない（Drive API の仕様で確認済み）。
+- CSV ファイルは、変換せずにそのまま置く。
+
+## 仕組み
+- **`s200/export.py`**（新規、副作用なし）：`readings_csv(rows)` と `daily_csv(rows, notes)` を作る。
+  - 既存の `analysis.with_trend` と `analysis.local_date` を使う。
+  - 除外した記録は `daily` の集計に含めない。
+- **`s200/drive.py`**（新規）
+  - `DriveClient(session)`：最小限の REST ラッパー。
+    - `ensure_folder`：フォルダを探し、なければ作る
+    - `upload`：新規作成は multipart、更新は media でファイル ID に上書き。変換の指定もできる
+    - `list_children`、`delete`
+  - **ファイル ID は `.drive/state.json` に保存する。** 保存した ID が 404 になったら（ユーザーが Drive で消したら）作り直す。
+  - `sync_once(store, client, state, now)`：4つのファイルを上げる。その日のバックアップがまだなければ、DB のスナップショット（`sqlite3` の backup API で一時ファイルに書き出す）も上げる。30個を超えた古いバックアップは消す。
+  - `DriveSync`：別スレッドで動く。
+    - `app.hub`（SSE と同じ配信の仕組み）を購読し、`reading` / `changed` イベントで「更新あり」にする。
+    - **最後の変更から60秒待ってからまとめてアップロードする。** 乗り直しや連続した編集を1回にまとめるため。起動時にも1回同期する。
+    - 日付が変わったらバックアップを取る。
+    - 失敗したら警告をログに出し、1分から最大30分まで間隔を延ばしながら再試行する。**BLE の受信や記録は止めない。**
+    - 状態（最終成功時刻、最後のエラー）を持つ。
+- **認証**：`google-auth` と `google-auth-oauthlib` を使う。InstalledAppFlow でブラウザから一度だけ認証し、更新トークンを `.drive/token.json`（権限 600）に保存する。REST の呼び出しには `AuthorizedSession` を使う。重い `google-api-python-client` は入れない。
+- **`config.toml`** に `[drive]` を追加する：`enabled`、`folder = "体重ログ"`、`backup_keep = 30`、`debounce_seconds = 60`。
+- **CLI**
+  - `s200 drive auth`：初回の認証。ユーザーが自分で実行する。
+  - `s200 drive sync`：今すぐ1回同期する。確認用。
+  - `s200 run`：`enabled` でトークンがあれば `DriveSync` を起動する。なければ、ログに「無効」と出すだけ。
+- **API とアプリ**
+  - `GET /api/drive` で同期の状態を返す。
+  - SwiftUI の設定画面に「Google Drive：最終同期 11:25 ／ エラー内容」を1行出す。
+- `.gitignore` に `.drive/` を追加する。
+
+## ユーザー側の初期設定（README に手順を書く。所要10分ほど）
+1. Google Cloud Console でプロジェクトを作り、Google Drive API を有効にする。
+2. OAuth 同意画面を設定する（外部、スコープは `drive.file`）。
+   - **「本番環境に公開」にする。** テスト中のままだと、トークンが7日で切れてしまう。`drive.file` は審査不要の権限なので、公開しても審査は入らない。
+3. 認証情報で OAuth クライアント（デスクトップアプリ）を作り、JSON を `.drive/client_secret.json` に置く。
+4. `! uv run s200 drive auth` を実行してブラウザで許可する。そのあと常駐プログラムを再起動する。
+
+## 実装順
+1. `export.py` ＋ テスト
+2. `drive.py`（クライアント、`sync_once`、`DriveSync`）＋ テスト。偽の HTTP セッションを使う：
+   - 2回目は更新になる
+   - 404 なら作り直す
+   - バックアップを世代管理する
+   - 連続したイベントが1回のアップロードにまとまる
+   - 失敗したら再試行する
+3. `config` / `cli` / `web` の変更 ＋ テスト（`[drive]` の読み込み、`/api/drive`）
+4. Swift 側：`DriveStatus` のデコードと設定画面の表示 ＋ Swift Testing
+5. README を更新し、コミットする（テスト結果を記録する）
+6. ユーザーが認証したら、`s200 drive sync` を実際に動かして確認し、常駐プログラムを再起動する
+
+## 確認方法
+- `.venv/bin/pytest`（web のテストはローカルポートを使うので、サンドボックス外で実行する）、`ruff check`、`xcodebuild test`
+- 実際の Drive で確認すること：
+  - `s200 drive sync` で、Drive に「体重ログ」フォルダと5つのファイルができる
+  - スプレッドシートを開いて中身を確認する
+  - 体重計に乗ると、60秒ほどでシートが更新される
+  - アプリで記録を除外すると、`daily` から消える
+  - 設定画面に最終同期時刻が出る
+- Drive でファイルを消したあと、次の同期で作り直される
+
+## 注意
+- アップロードするのは体重とメモだけ。行き先は本人の Drive で、権限は `drive.file`（このアプリが作ったファイルだけ）。
+- 秘密情報（`client_secret.json`、`token.json`）は `.drive/` に置き、git に入れない。
+- 認証にはブラウザ操作とローカルポートが要るので、`s200 drive auth` はユーザーに実行してもらう。

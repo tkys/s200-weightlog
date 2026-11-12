@@ -14,3 +14,11 @@ goal_kg = 65.0
 [server]
 db_path = "weights.sqlite3"
 port = 8200
+
+[drive]
+# Google Drive への自動アップロード（README の「Google Drive 連携」参照）
+# 初回は `uv run s200 drive auth` で認証してから true にする
+enabled = false
+folder = "体重ログ"
+backup_keep = 30        # 残す日次バックアップの数
+debounce_seconds = 60   # 最後の変更からこの秒数待ってまとめてアップロード

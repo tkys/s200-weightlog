@@ -1,4 +1,4 @@
-"""Command line entry point: `s200 scan` and `s200 run`."""
+"""Command line entry point: `s200 scan`, `s200 run` and `s200 drive ...`."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import threading
 from datetime import datetime
 
 from s200 import config as config_mod
-from s200 import scanner, web
+from s200 import drive, scanner, web
 from s200.mibeacon import Reading
 from s200.store import Store
 
@@ -29,6 +29,8 @@ def cmd_run(args: argparse.Namespace) -> None:
         profile_id=cfg.profile_id,
         defaults={"height_cm": cfg.height_cm, "goal_kg": cfg.goal_kg},
     )
+
+    drive_sync = start_drive_sync(cfg, store, app)
 
     server = web.make_server(app, args.host, cfg.port)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -53,7 +55,68 @@ def cmd_run(args: argparse.Namespace) -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        if drive_sync:
+            drive_sync.stop()
         server.shutdown()
+        store.close()
+
+
+def _syncer(cfg: config_mod.Config, store: Store) -> drive.Syncer:
+    client = drive.DriveClient(drive.session(cfg.drive.token))
+    return drive.Syncer(
+        store,
+        client,
+        drive.State(cfg.drive.state),
+        profile_id=cfg.profile_id,
+        folder=cfg.drive.folder,
+        backup_keep=cfg.drive.backup_keep,
+    )
+
+
+def start_drive_sync(
+    cfg: config_mod.Config, store: Store, app: web.WeightApp
+) -> drive.DriveSync | None:
+    if not cfg.drive.enabled:
+        log.info("drive sync: disabled in config")
+        return None
+    if not cfg.drive.token.exists():
+        log.warning("drive sync: no token, run `s200 drive auth` first")
+        app.drive_status = lambda: {"enabled": True, "last_error": "未認証: s200 drive auth"}
+        return None
+    try:
+        syncer = _syncer(cfg, store)
+    except Exception as e:  # revoked or broken token: keep recording without Drive
+        log.warning("drive sync: cannot authorize: %s", e)
+        status = {"enabled": True, "last_error": f"認証エラー: {e}"}
+        app.drive_status = lambda: status
+        return None
+    worker = drive.DriveSync(syncer, app.hub, debounce=cfg.drive.debounce_seconds)
+    app.drive_status = worker.status
+    worker.start()
+    log.info("drive sync: uploading to My Drive/%s", cfg.drive.folder)
+    return worker
+
+
+def cmd_drive_auth(args: argparse.Namespace) -> None:
+    cfg = config_mod.load(args.config)
+    if not cfg.drive.client_secret.exists():
+        raise SystemExit(
+            f"{cfg.drive.client_secret} がありません。"
+            "Google Cloud で作った OAuth クライアント（デスクトップアプリ）の JSON を置いてください"
+        )
+    drive.authorize(cfg.drive.client_secret, cfg.drive.token)
+    print(f"認証できました: {cfg.drive.token}")
+    if not cfg.drive.enabled:
+        print("config.toml の [drive] enabled = true にして、常駐プログラムを再起動してください")
+
+
+def cmd_drive_sync(args: argparse.Namespace) -> None:
+    cfg = config_mod.load(args.config)
+    store = Store(cfg.db_path)
+    try:
+        for name in _syncer(cfg, store).sync():
+            print(f"uploaded {cfg.drive.folder}/{name}")
+    finally:
         store.close()
 
 
@@ -69,6 +132,16 @@ def main(argv: list[str] | None = None) -> None:
     p_run.add_argument("--config", default="config.toml")
     p_run.add_argument("--host", default="127.0.0.1")
     p_run.set_defaults(func=cmd_run)
+
+    p_drive = sub.add_parser("drive", help="Google Drive upload")
+    drive_sub = p_drive.add_subparsers(dest="drive_command", required=True)
+    for name, func, help_text in (
+        ("auth", cmd_drive_auth, "authorize access to Google Drive (opens a browser)"),
+        ("sync", cmd_drive_sync, "upload everything now"),
+    ):
+        p = drive_sub.add_parser(name, help=help_text)
+        p.add_argument("--config", default="config.toml")
+        p.set_defaults(func=func)
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

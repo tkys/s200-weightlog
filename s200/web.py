@@ -8,6 +8,7 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from urllib.parse import parse_qs, urlparse
@@ -60,6 +61,8 @@ class WeightApp:
         self.hub = EventHub()
         self.profile_id = profile_id
         self.defaults = defaults or {}
+        # Replaced by the Drive worker's status() when uploading is on.
+        self.drive_status: Callable[[], dict] = lambda: {"enabled": False}
 
     def settings(self) -> dict:
         return self.store.get_settings(self.defaults)
@@ -126,6 +129,8 @@ def make_server(app: WeightApp, host: str = "127.0.0.1", port: int = 8200) -> Th
                 self._json(200, app.store.get_note(m.group(1)))
             elif path == "/api/settings":
                 self._json(200, app.settings())
+            elif path == "/api/drive":
+                self._json(200, app.drive_status())
             elif path == "/api/stream":
                 self._stream()
             else:

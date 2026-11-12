@@ -89,6 +89,12 @@ def test_settings_api(server):
     assert call(server, "PUT", "/api/settings", {"bogus": 1})[0] == 400
 
 
+def test_drive_status(server, app):
+    assert call(server, "GET", "/api/drive") == (200, {"enabled": False})
+    app.drive_status = lambda: {"enabled": True, "last_success": 1, "last_error": None}
+    assert call(server, "GET", "/api/drive")[1]["last_success"] == 1
+
+
 def test_bad_json_and_unknown_paths(server):
     conn = http.client.HTTPConnection("127.0.0.1", server, timeout=5)
     conn.request("PUT", "/api/settings", body=b"{oops", headers={"Content-Length": "5"})

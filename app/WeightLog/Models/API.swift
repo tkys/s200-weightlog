@@ -62,6 +62,28 @@ struct BodySettings: Codable, Equatable, Sendable {
     var startKg: Double?
 }
 
+/// `GET /api/drive`: state of the Google Drive upload.
+struct DriveStatus: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var lastSuccess: Int?  // unix seconds, like Reading.ts
+    var lastError: String?
+
+    enum Line: Equatable {
+        case off
+        case error(String)
+        case synced(Date)
+        case waiting
+    }
+
+    /// What the settings screen shows; an error wins until a sync succeeds again.
+    var line: Line {
+        if !enabled { return .off }
+        if let lastError { return .error(lastError) }
+        if let lastSuccess { return .synced(Date(timeIntervalSince1970: TimeInterval(lastSuccess))) }
+        return .waiting
+    }
+}
+
 struct ReadingsResponse: Codable, Sendable {
     let readings: [Reading]
     let settings: BodySettings

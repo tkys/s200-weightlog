@@ -36,6 +36,10 @@ struct APIClient: Sendable {
         try await send("PATCH", "api/readings/\(readingID)", body: ["status": status.rawValue] as [String: String])
     }
 
+    func driveStatus() async throws -> DriveStatus {
+        try await get("api/drive")
+    }
+
     func putSettings(_ settings: BodySettings) async throws -> BodySettings {
         try await send("PUT", "api/settings", body: settings)
     }
