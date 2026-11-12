@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プライバシーポリシー – 体重ログ (s200-weightlog)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<p><a href="./">体重ログ (s200-weightlog)</a></p>
+<h1>プライバシーポリシー</h1>
+<p class="meta">最終更新日：2026年11月13日</p>
+
+<p>「体重ログ」（以下「本アプリ」）は、Xiaomi Smart Scale S200 の計測値を、利用者自身の Mac で記録するための個人用ツールです。本アプリは利用者の Mac の中だけで動作し、開発者が運営するサーバーはありません。</p>
+
+<h2>扱う情報</h2>
+<ul>
+<li>体重計から受信した体重と計測日時</li>
+<li>利用者がアプリに入力した日ごとのメモ・タグ、身長・目標体重などの設定</li>
+</ul>
+<p>これらは利用者の Mac 上のデータベースに保存されます。</p>
+
+<h2>Google ユーザーデータの扱い</h2>
+<p>利用者が Google Drive 連携を有効にした場合に限り、本アプリは Google アカウントへのアクセスを求めます。</p>
+<ul>
+<li><strong>スコープ</strong>：<code>https://www.googleapis.com/auth/drive.file</code> のみ。本アプリが作成したファイルにだけアクセスでき、Google Drive 上のそれ以外のファイルを読むことはできません。</li>
+<li><strong>使い方</strong>：上記の体重記録・メモを、利用者自身の Google Drive の「体重ログ」フォルダに、スプレッドシート・CSV・データベースのバックアップとして保存・更新します。古いバックアップの削除も、本アプリが作成したファイルに限られます。</li>
+<li><strong>共有</strong>：Google ユーザーデータや体重記録を、開発者を含む第三者に送信・共有・販売することはありません。広告や分析にも使いません。</li>
+<li><strong>保存</strong>：Google の認証トークンは利用者の Mac 上（アクセス権を本人のみに制限したファイル）にのみ保存されます。</li>
+</ul>
+<p>本アプリによる Google API から受け取った情報の使用および他のアプリへの転送は、<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API サービスのユーザーデータに関するポリシー</a>（限定使用の要件を含む）に従います。</p>
+
+<h2>アクセスの取り消しとデータの削除</h2>
+<ul>
+<li>Google アカウントの<a href="https://myaccount.google.com/connections">サードパーティ接続の管理</a>から、いつでも本アプリのアクセスを取り消せます。</li>
+<li>Google Drive に保存されたファイルは、利用者が Drive 上で自由に削除できます。</li>
+<li>Mac 上のデータは、本アプリのフォルダにあるデータベースと <code>.drive/</code> フォルダを削除すると消去されます。</li>
+</ul>
+
+<h2>お問い合わせ</h2>
+<p><a href="https://github.com/tkys/s200-weightlog/issues">GitHub の Issue</a> からご連絡ください。</p>
+
+<hr>
+<h2 lang="en">Summary (English)</h2>
+<p lang="en">WeightLog is a personal tool that runs only on the user's own Mac. If Google Drive upload is enabled, it requests only the <code>drive.file</code> scope and uses it solely to create and update its own files (weight records, notes, database backups) in the user's own Google Drive. No Google user data is sent to the developer or any third party, or used for advertising or analytics. The OAuth token is stored only on the user's Mac. The app's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. Access can be revoked at any time from the Google Account third-party connections page.</p>
+</main>
+</body>
+</html>
