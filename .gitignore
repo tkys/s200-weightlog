@@ -8,3 +8,4 @@ config.toml
 logs/
 backups/
 .drive/
+.DS_Store

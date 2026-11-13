@@ -1,28 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: scripts/launchd.sh install fills in the checkout path. -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
   <string>com.user.s200</string>
-  <key>ProgramArguments</key>
   <!-- caffeinate -i: the Mac must not idle-sleep, or BLE scanning stops and weigh-ins are lost -->
+  <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/caffeinate</string>
     <string>-i</string>
-    <string>/Users/m1macmini/playground/BLE-huawai-s200/.venv/bin/s200</string>
+    <string>__PROJECT_DIR__/.venv/bin/s200</string>
     <string>run</string>
     <string>--config</string>
-    <string>/Users/m1macmini/playground/BLE-huawai-s200/config.toml</string>
+    <string>__PROJECT_DIR__/config.toml</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/m1macmini/playground/BLE-huawai-s200</string>
+  <string>__PROJECT_DIR__</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/Users/m1macmini/playground/BLE-huawai-s200/logs/s200.log</string>
+  <string>__PROJECT_DIR__/logs/s200.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/m1macmini/playground/BLE-huawai-s200/logs/s200.log</string>
+  <string>__PROJECT_DIR__/logs/s200.log</string>
 </dict>
 </plist>
