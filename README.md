@@ -148,3 +148,7 @@ cd app && xcodegen generate && xcodebuild -project WeightLog.xcodeproj -scheme W
 
 プロトコルの解析は [Bluetooth-Devices/xiaomi-ble](https://github.com/Bluetooth-Devices/xiaomi-ble) などの先行実装に負っています（一覧は [docs/protocol.md](docs/protocol.md#参考実装)）。
 本プロジェクトは Xiaomi とは無関係の非公式ツールです。
+
+## ライセンス
+
+[MIT](LICENSE)
