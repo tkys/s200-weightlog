@@ -1,5 +1,16 @@
 import Foundation
 
+/// The UI is Japanese, so dates are too, whatever the system language is.
+enum AppLocale {
+    static let locale = Locale(identifier: "ja_JP")
+
+    static var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        return calendar
+    }
+}
+
 enum Format {
     static func kg(_ value: Double?, digits: Int = 2) -> String {
         guard let value else { return "–" }
@@ -15,15 +26,16 @@ enum Format {
     }
 
     static func dateTime(_ date: Date) -> String {
-        date.formatted(.dateTime.month().day().weekday(.abbreviated).hour().minute())
+        date.formatted(.dateTime.month().day().weekday(.abbreviated).hour().minute()
+            .locale(AppLocale.locale))
     }
 
     static func day(_ date: Date) -> String {
-        date.formatted(.dateTime.year().month().day())
+        date.formatted(.dateTime.year().month().day().locale(AppLocale.locale))
     }
 
     static func relative(_ date: Date, now: Date = .now) -> String {
-        date.formatted(.relative(presentation: .named))
+        date.formatted(.relative(presentation: .named).locale(AppLocale.locale))
     }
 }
 

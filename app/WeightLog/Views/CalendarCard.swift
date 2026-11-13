@@ -6,7 +6,7 @@ struct CalendarCard: View {
     @State private var month = Date.now
     @State private var editing: String?
 
-    private let calendar = Calendar.current
+    private let calendar = AppLocale.calendar
 
     var body: some View {
         let infos = model.dayInfos
@@ -23,7 +23,7 @@ struct CalendarCard: View {
                 }
                 HStack {
                     Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-                    Text(month.formatted(.dateTime.year().month(.wide)))
+                    Text(month.formatted(.dateTime.year().month(.wide).locale(AppLocale.locale)))
                         .font(.title3.weight(.semibold))
                         .frame(minWidth: 120)
                     Button { shift(1) } label: { Image(systemName: "chevron.right") }
@@ -94,7 +94,7 @@ private struct DayCell: View {
     var body: some View {
         VStack(spacing: 2) {
             HStack(spacing: 3) {
-                Text(date.formatted(.dateTime.day()))
+                Text(date.formatted(.dateTime.day().locale(AppLocale.locale)))
                     .font(.caption.weight(isToday ? .bold : .regular))
                 if hasNote {
                     Circle().fill(Palette.weight).frame(width: 5, height: 5)

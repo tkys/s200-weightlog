@@ -107,6 +107,16 @@ let summaryJSON = """
         #expect(Format.kg(74.6, digits: 1) == "74.6")
     }
 
+    @Test func datesAreJapaneseRegardlessOfSystemLanguage() {
+        var c = DateComponents()
+        (c.year, c.month, c.day, c.hour, c.minute) = (2026, 11, 13, 7, 32)
+        let date = AppLocale.calendar.date(from: c)!
+        #expect(Format.dateTime(date).contains("11月13日"))
+        #expect(Format.dateTime(date).contains("(金)"))
+        #expect(Format.day(date) == "2026年11月13日")
+        #expect(CalendarLogic.weekdaySymbols() == ["日", "月", "火", "水", "木", "金", "土"])
+    }
+
     @Test func trendClassification() {
         #expect(Trend(-0.3) == .down)
         #expect(Trend(0.3) == .up)

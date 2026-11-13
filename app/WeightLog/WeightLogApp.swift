@@ -8,6 +8,7 @@ struct WeightLogApp: App {
         Window("体重ログ", id: "main") {
             MainView()
                 .environment(model)
+                .environment(\.locale, AppLocale.locale)
                 .frame(minWidth: 880, minHeight: 600)
         }
         .defaultSize(width: 1120, height: 760)
@@ -15,6 +16,7 @@ struct WeightLogApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environment(model)
+                .environment(\.locale, AppLocale.locale)
         } label: {
             MenuBarLabel()
                 .environment(model)
@@ -26,6 +28,7 @@ struct WeightLogApp: App {
         Settings {
             SettingsView()
                 .environment(model)
+                .environment(\.locale, AppLocale.locale)
         }
     }
 }

@@ -16,7 +16,11 @@ enum Pane: String, CaseIterable, Identifiable {
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
-    @State private var pane: Pane = .home
+    @State private var pane: Pane
+
+    init(pane: Pane = .home) {
+        _pane = State(initialValue: pane)
+    }
 
     var body: some View {
         NavigationSplitView {

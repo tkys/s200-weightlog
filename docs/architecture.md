@@ -2,6 +2,8 @@
 
 ## 全体像
 
+![構成図](images/architecture.svg)
+
 ```
  S200 ─BLE─▶ scanner.watch ─▶ mibeacon.decrypt_objects ─▶ WeightApp.ingest ─▶ Store (SQLite)
                                                               │
@@ -87,3 +89,4 @@ settings(key TEXT PRIMARY KEY, value TEXT /* JSON */)  -- height_cm, goal_kg, st
 
 - `uv run pytest`：復号（実パケット）、移行、分析の各パターン、API と SSE（実ソケット）、スキャナ（偽の BleakScanner）、Drive（メモリ上の偽 Drive）
 - `xcodebuild test`：JSON のデコード、SSE の解析、表示用の整形、カレンダー計算
+- `scripts/screenshots.sh`：README の画面写真を作り直す。`scripts/demo_data.py` が本物の分析ロジックでダミーデータを作り、`ScreenshotTests` がアプリのウィンドウを日本語で PNG に描き出す（`SCREENSHOT_FIXTURES` を渡したときだけ動く）

@@ -3,17 +3,31 @@
 Xiaomi スマート体重計 S200 が Bluetooth LE で発信する計測値（暗号化された MiBeacon 広告）を Mac で受信・復号し、
 SQLite に自動で記録します。体重計とは接続しない**パッシブ受信**なので、体重計の電池や Xiaomi Home アプリの動作に影響しません。
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
+  <img alt="WeightLog のホーム画面：最新の体重、トレンド体重・ペース・目標までの残り・連続記録、30 日の推移グラフ" src="docs/images/home-light.png">
+</picture>
+
 - **乗るだけで記録**：常駐プログラムがバックグラウンドで受信。家族が乗った・荷物を持ったなどの外れ値は自動で除外（戻せる）
 - **Mac アプリ**（SwiftUI）：トレンド体重・週あたりのペース・目標到達予定日・カレンダーとメモ。乗った瞬間にリアクションと通知、メニューバーに最新値
 - **Google Drive 連携**（任意）：スプレッドシート・CSV・日次バックアップを自分の Drive に自動アップロード
 - **ローカル API**：`http://127.0.0.1:8200` の JSON API と SSE。ほかのツールからも使える
 
-```
- Xiaomi S200 ──BLE 広告(0xFE95, AES-CCM)──▶ s200 run（Python 常駐, launchd）
-                                              ├─ SQLite (weights.sqlite3)
-                                              ├─ HTTP API + SSE :8200 ──▶ WeightLog.app（SwiftUI）
-                                              └─ Google Drive（任意）
-```
+| 乗った瞬間 | カレンダーとメモ | 記録と除外 |
+|---|---|---|
+| ![体重計に乗ると数字がカウントアップし、前回比とひとことが出る](docs/images/reaction-light.png) | ![月ごとのカレンダー。前回より減った日は緑、増えた日は赤](docs/images/calendar-light.png) | ![全記録の一覧。外れ値と測り直しは自動で除外され、戻せる](docs/images/records-light.png) |
+
+<img align="right" width="300" alt="メニューバーのポップオーバー：最新の体重、前回比と週あたりのペース、ミニグラフ" src="docs/images/menubar-light.png">
+
+メニューバーにも最新の体重とトレンドの矢印が常に出ていて、クリックするとミニグラフとひとことが見られます。
+
+画面の数値はすべてダミーデータです（[`scripts/screenshots.sh`](scripts/screenshots.sh) で再生成できます）。
+
+<br clear="right">
+
+## しくみ
+
+![構成図：Xiaomi S200 の BLE 広告を Mac の常駐プログラムが受信・復号し、SQLite に保存。API と SSE で WeightLog.app に配信し、任意で Google Drive にアップロードする](docs/images/architecture.svg)
 
 詳しい設計は [docs/architecture.md](docs/architecture.md)、体重計のプロトコルは [docs/protocol.md](docs/protocol.md) を参照してください。
 
@@ -129,7 +143,7 @@ s200/            Python 常駐（受信・復号・保存・分析・API・Drive
 tests/           pytest
 app/             SwiftUI アプリ（XcodeGen の project.yml）
 launchd/         LaunchAgent のテンプレート
-scripts/         launchd の登録スクリプト
+scripts/         launchd の登録、ダミーデータと画面写真の生成
 docs/            設計・プロトコル・Drive 手順、GitHub Pages（紹介ページとプライバシーポリシー）
 config.example.toml
 ```
@@ -142,6 +156,7 @@ config.example.toml
 uv run pytest          # Python のテスト（実機の暗号化パケットで復号を検証）
 uv run ruff check .
 cd app && xcodegen generate && xcodebuild -project WeightLog.xcodeproj -scheme WeightLog -derivedDataPath build test
+scripts/screenshots.sh # README の画面写真をダミーデータで作り直す
 ```
 
 ## 謝辞・参考

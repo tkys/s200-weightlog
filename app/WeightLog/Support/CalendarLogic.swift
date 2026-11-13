@@ -41,7 +41,7 @@ enum CalendarLogic {
         return cells
     }
 
-    static func weekdaySymbols(calendar: Calendar = .current) -> [String] {
+    static func weekdaySymbols(calendar: Calendar = AppLocale.calendar) -> [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
         let start = calendar.firstWeekday - 1
         return Array(symbols[start...] + symbols[..<start])
